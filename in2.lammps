@@ -1,0 +1,44 @@
+
+#Initiailzaion
+units 				metal
+atom_style 			atomic
+boundary 			p p p
+read_data 			cnt.data
+pair_style 			airebo 3 1 1  #Source for cutoff(https://matsci.org/t/airebo-force-field-for-graphene/33406/4)
+pair_coeff 			* * CH.airebo C
+
+#Defining clamp/grip and mid regions
+group 				cnt type 1
+variable 			zmax equal bound(cnt,zmax)-0.5
+variable 			zmin equal bound(cnt,zmin)+0.5
+region 				top block INF INF INF INF ${zmax} INF
+group 				top region top
+region 				bot block INF INF INF INF INF ${zmin}
+group 				bot region bot
+region 				mid block INF INF INF INF ${zmin} ${zmax}
+group 				mid region mid
+
+#Visualization
+thermo				100
+timestep 			0.0005
+dump 				dump all atom 100 dump.visualition
+
+velocity 			mid create 300 12345 mom yes rot yes  #Only motion of mid section atoms matter, which have to start moving as if they were in ambient conditions ,i.e., at 300K
+fix 				nve all nve 			      #UTM has this case
+compute 			Tmid mid temp 			      #Computing the only temperature that matters and using this to fluctuate the temperature of the entire cell
+fix myber 			mid temp/berendsen 300 300 0.1        #Berensden not due to any particular reason. studied it in course.
+fix_modify 			myber temp Tmid			      #Using temperature of mid section to control that of entire cell
+
+#Only for equilibration
+fix 				topforce bot setforce 0 0 0	      #In clamp
+fix 				topforce top setforce 0 0 0	      #In Clamp
+velocity 			bot set 0 0 0
+velocity 			top set 0 0 0
+
+#Equilibiration
+run 				5000
+
+#Deformation
+velocity 			top set 0 0 0.15
+run 				280000
+
